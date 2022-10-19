@@ -2,10 +2,10 @@ import logging
 import os
 import time
 from logging.config import fileConfig
-from pprint import pprint
 
 import requests
 from dotenv import load_dotenv
+from requests import HTTPError
 from telegram import Bot
 
 from exceptions import TokenError
@@ -17,6 +17,7 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
 RETRY_TIME = 600
+BEGINNING_TIME = 1
 ENDPOINT = "https://practicum.yandex.ru/api/user_api/homework_statuses/"
 HEADERS = {"Authorization": f"OAuth {PRACTICUM_TOKEN}"}
 
@@ -46,7 +47,6 @@ def get_api_answer(current_timestamp):
     homework_statuses = requests.get(ENDPOINT, headers=HEADERS, params=params)
 
     if homework_statuses.status_code != 200:
-        logger.error("API not available")
         homework_statuses.raise_for_status()
 
     logger.info("Worked out function get_api_answer")
@@ -55,30 +55,47 @@ def get_api_answer(current_timestamp):
 
 def check_response(response):
     """Проверяет API на корректность."""
-    if isinstance(response, dict):
-        homeworks = response.get("homeworks")
-        if len(homeworks) != 0:
-            logger.info("Worked out function check_response")
-            return homeworks[0]
-        logger.info("Worked out function check_response (no homework)")
-        return homeworks
-    raise TypeError("В функцию check_response был передан не словарь")
+    if not isinstance(response, dict):
+        logger.error("В функцию check_response пришёл не словарь")
+        raise TypeError(
+            "Unexpected response in check_response function, dict expected"
+        )
+    homeworks = response.get("homeworks")
+    if homeworks is None:
+        logger.error("В ответе API отсутствует ключ homeworks")
+        raise KeyError("В ответе API отсутствует ключ homeworks")
+    if not isinstance(homeworks, list):
+        logger.error("Словарь homeworks содержит значения не в виде массива")
+        raise TypeError("homeworks dictionary contains non-tuple values")
+    logger.info("Worked out function check_response")
+    return homeworks
 
 
 def parse_status(homework):
     """Извлекает информацию о конкретной домашней работе."""
+    if not isinstance(homework, dict):
+        raise TypeError(
+            "Unexpected response in parse_status function, dict expected"
+        )
     if len(homework) != 0:
-        if isinstance(homework, dict):
-            homework_name = homework.get("homework_name")
-            homework_status = homework.get("status")
-            verdict = HOMEWORK_STATUSES.get(homework_status)
+        homework_name = homework.get("homework_name")
+        if homework_name is None:
+            message = "В homework отсутствует ключ homework_name"
+            logger.error(message)
+            raise KeyError(message)
+        homework_status = homework.get("status")
+        if homework_status is None:
+            message = "В homework отсутствует ключ homework_status"
+            logger.error(message)
+            raise KeyError(message)
+        verdict = HOMEWORK_STATUSES.get(homework_status)
+        if verdict is None:
+            message = "Ключ verdict отсутствует в ожидаемых ответах"
+            logger.error(message)
+            raise KeyError(message)
 
-            logger.info("Worked out function parse_status")
-            return f'Изменился статус проверки работы "{homework_name}". {verdict}'
-        else:
-            raise KeyError(
-                "Тут какое-то говно - поправь"
-            )  # ToDo подумай как поменять ошибку
+        logger.info("Worked out function parse_status")
+        return f'Изменился статус проверки работы "{homework_name}". {verdict}'
     logger.info("Worked out function parse_status (no homework)")
     return "За выбранный отрезок времени нет проверенных работ"
 
@@ -103,28 +120,38 @@ def main():
     if not check_tokens():
         raise TokenError()
     bot = Bot(token=TELEGRAM_TOKEN)
-    current_timestamp = 1  # int(time.time())
+    current_timestamp = BEGINNING_TIME
 
-    response = get_api_answer(current_timestamp)
-    sample_result = parse_status(check_response(response))
+    sample_result = ""
 
     while True:
         try:
             response = get_api_answer(current_timestamp)
-            result = parse_status(check_response(response))
+            homework = check_response(response)[0]
+            result = parse_status(homework)
             if result != sample_result:
-                send_message(result)
+                send_message(bot, result)
                 sample_result = result
 
-            # current_timestamp = ...
-            time.sleep(RETRY_TIME)
+            current_timestamp = response.get("current_date")
+
+        except HTTPError as error:
+            logger.error(f"API not available {error}")
+            send_message(bot, f"API Практикума недоступна {error}")
+
+        except TypeError as error:
+            send_message(bot, f"Неожиданный формат данных {error}")
+
+        except KeyError as error:
+            send_message(bot, f"Отсутствует ключ {error}")
 
         except Exception as error:
             message = f"Сбой в работе программы: {error}"
-            send_message(message)
+            send_message(bot, message)
+        else:
+            logger.debug("Цикл main успешен")
+        finally:
             time.sleep(RETRY_TIME)
-        # else:
-        # ...
 
 
 if __name__ == "__main__":
