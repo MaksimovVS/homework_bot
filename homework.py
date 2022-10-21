@@ -45,12 +45,17 @@ def get_api_answer(current_timestamp):
     params = {"from_date": timestamp}
 
     homework_statuses = requests.get(ENDPOINT, headers=HEADERS, params=params)
+    logger.info('Произошел запрос к API')
 
     if homework_statuses.status_code != 200:
         homework_statuses.raise_for_status()
 
     logger.info("Worked out function get_api_answer")
-    return homework_statuses.json()
+    try:
+        return homework_statuses.json()
+    except Exception:
+        message = 'Ответвет API не json'
+        logger.error(message)
 
 
 def check_response(response):
@@ -77,7 +82,7 @@ def parse_status(homework):
         raise TypeError(
             "Unexpected response in parse_status function, dict expected"
         )
-    if len(homework) != 0:
+    if homework:
         homework_name = homework.get("homework_name")
         if homework_name is None:
             message = "В homework отсутствует ключ homework_name"
@@ -102,17 +107,7 @@ def parse_status(homework):
 
 def check_tokens():
     """Проверяет доступность переменных окружения."""
-    if not PRACTICUM_TOKEN:
-        logger.critical("Invalid or unavailable token PRACTICUM_TOKEN")
-        return False
-    if not TELEGRAM_TOKEN:
-        logger.critical("Invalid or unavailable token TELEGRAM_TOKEN")
-        return False
-    if not TELEGRAM_CHAT_ID:
-        logger.critical("Invalid or unavailable token TELEGRAM_CHAT_ID")
-        return False
-    logger.info("Worked out function check_tokens")
-    return True
+    return all([PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID])
 
 
 def main():
@@ -127,7 +122,10 @@ def main():
     while True:
         try:
             response = get_api_answer(current_timestamp)
-            homework = check_response(response)[0]
+
+            homework = check_response(response)
+            if homework:
+                homework = homework[0]
             result = parse_status(homework)
             if result != sample_result:
                 send_message(bot, result)
@@ -147,6 +145,7 @@ def main():
 
         except Exception as error:
             message = f"Сбой в работе программы: {error}"
+            logger.error(message)
             send_message(bot, message)
         else:
             logger.debug("Цикл main успешен")
