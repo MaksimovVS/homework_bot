@@ -113,6 +113,7 @@ def check_tokens():
 def main():
     """Основная логика работы бота."""
     if not check_tokens():
+        logger.error(TokenError)
         raise TokenError()
     bot = Bot(token=TELEGRAM_TOKEN)
     current_timestamp = BEGINNING_TIME
@@ -126,7 +127,9 @@ def main():
             homework = check_response(response)
             if homework:
                 homework = homework[0]
-            result = parse_status(homework)
+                result = parse_status(homework)
+            else:
+                result = sample_result
             if result != sample_result:
                 send_message(bot, result)
                 sample_result = result
