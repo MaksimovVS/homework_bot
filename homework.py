@@ -67,13 +67,23 @@ def check_response(response):
         )
     homeworks = response.get("homeworks")
     if homeworks is None:
-        logger.error("В ответе API отсутствует ключ homeworks")
-        raise KeyError("В ответе API отсутствует ключ homeworks")
+        message = 'В ответе API отсутствует ключ homeworks'
+        logger.error(message)
+        raise KeyError(message)
     if not isinstance(homeworks, list):
         logger.error("Словарь homeworks содержит значения не в виде массива")
         raise TypeError("homeworks dictionary contains non-tuple values")
     logger.info("Worked out function check_response")
     return homeworks
+
+
+def check_key_in_dict(dictionary, key):
+    value = dictionary.get(key)
+    if value:
+        return value
+    message = f'В ответе API отсутствует ключ {key}'
+    logger.error(message)
+    raise KeyError(message)
 
 
 def parse_status(homework):
@@ -107,7 +117,7 @@ def parse_status(homework):
 
 def check_tokens():
     """Проверяет доступность переменных окружения."""
-    return all([PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID])
+    return all((PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID))
 
 
 def main():
@@ -118,22 +128,13 @@ def main():
     bot = Bot(token=TELEGRAM_TOKEN)
     current_timestamp = BEGINNING_TIME
 
-    sample_result = ""
-
     while True:
         try:
             response = get_api_answer(current_timestamp)
-
-            homework = check_response(response)
-            if homework:
-                homework = homework[0]
-                result = parse_status(homework)
-            else:
-                result = sample_result
-            if result != sample_result:
+            homeworks = check_response(response)
+            if homeworks:
+                result = parse_status(homeworks[0])
                 send_message(bot, result)
-                sample_result = result
-
             current_timestamp = response.get("current_date")
 
         except HTTPError as error:
