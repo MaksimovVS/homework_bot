@@ -45,7 +45,7 @@ def get_api_answer(current_timestamp):
     params = {"from_date": timestamp}
 
     homework_statuses = requests.get(ENDPOINT, headers=HEADERS, params=params)
-    logger.info('Произошел запрос к API')
+    logger.info("Произошел запрос к API")
 
     if homework_statuses.status_code != 200:
         homework_statuses.raise_for_status()
@@ -54,7 +54,7 @@ def get_api_answer(current_timestamp):
     try:
         return homework_statuses.json()
     except Exception:
-        message = 'Ответвет API не json'
+        message = "Ответвет API не json"
         logger.error(message)
 
 
@@ -66,11 +66,6 @@ def check_response(response):
             "Unexpected response in check_response function, dict expected"
         )
     homeworks = check_key_in_dict(response, "homeworks")
-    '''homeworks = response.get("homeworks")
-    if homeworks is None:
-        message = 'В ответе API отсутствует ключ homeworks'
-        logger.error(message)
-        raise KeyError(message)'''
     if not isinstance(homeworks, list):
         logger.error("Словарь homeworks содержит значения не в виде массива")
         raise TypeError("homeworks dictionary contains non-tuple values")
@@ -79,10 +74,11 @@ def check_response(response):
 
 
 def check_key_in_dict(dictionary, key):
+    """Райзит KeyError и пишет в бот если в словаре нет нужного ключа."""
     value = dictionary.get(key)
     if not value is None:
         return value
-    message = f'В ответе API отсутствует ключ {key}'
+    message = f"В ответе API отсутствует ключ {key}"
     logger.error(message)
     raise KeyError(message)
 
@@ -96,27 +92,9 @@ def parse_status(homework):
     homework_name = check_key_in_dict(homework, "homework_name")
     homework_status = check_key_in_dict(homework, "status")
     verdict = check_key_in_dict(HOMEWORK_STATUSES, homework_status)
-    '''if homework:
-        homework_name = homework.get("homework_name")
-        if homework_name is None:
-            message = "В homework отсутствует ключ homework_name"
-            logger.error(message)
-            raise KeyError(message)
-        homework_status = homework.get("status")
-        if homework_status is None:
-            message = "В homework отсутствует ключ homework_status"
-            logger.error(message)
-            raise KeyError(message)
-        verdict = HOMEWORK_STATUSES.get(homework_status)
-        if verdict is None:
-            message = "Ключ verdict отсутствует в ожидаемых ответах"
-            logger.error(message)
-            raise KeyError(message)'''
 
     logger.info("Worked out function parse_status")
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
-    logger.info("Worked out function parse_status (no homework)")
-    return "За выбранный отрезок времени нет проверенных работ"
 
 
 def check_tokens():
@@ -145,20 +123,20 @@ def main():
             logger.error(f"API not available {error}")
             send_message(bot, f"API Практикума недоступна {error}")
 
-        #except TypeError as error:
-        #    message = f"Неожиданный формат данных {error}"
-        #    logger.error(message)
-        #    send_message(bot, message)
+        except TypeError as error:
+            message = f"Неожиданный формат данных {error}"
+            logger.error(message)
+            send_message(bot, message)
 
         except KeyError as error:
             message = f"Отсутствует ключ {error}"
             logger.error(message)
             send_message(bot, message)
 
-        #except Exception as error:
-        #    message = f"Сбой в работе программы: {error}"
-        #    logger.error(message)
-        #    send_message(bot, message)
+        except Exception as error:
+            message = f"Сбой в работе программы: {error}"
+            logger.error(message)
+            send_message(bot, message)
         else:
             logger.debug("Цикл main успешен")
         finally:
