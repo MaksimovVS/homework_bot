@@ -76,7 +76,7 @@ def check_response(response):
 def check_key_in_dict(dictionary, key):
     """Райзит KeyError и пишет в бот если в словаре нет нужного ключа."""
     value = dictionary.get(key)
-    if not value is None:
+    if value is not None:
         return value
     message = f"В ответе API отсутствует ключ {key}"
     logger.error(message)
